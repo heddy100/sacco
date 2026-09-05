@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.can_post(uuid) TO authenticated;
