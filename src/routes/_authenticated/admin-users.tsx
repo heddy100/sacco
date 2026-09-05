@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useRoles, useSession, type AppRole } from "@/hooks/useSacco";
 import { supabase } from "@/integrations/supabase/client";
-import { createSaccoUser, resetSaccoUserPassword, setSaccoUserPassword } from "@/lib/admin-user-management";
+import { createSaccoUser, deleteSaccoUser, resetSaccoUserPassword, setSaccoUserPassword, updateSaccoUser } from "@/lib/admin-user-management";
 import { shortDate } from "@/lib/sacco";
 
 export const Route = createFileRoute("/_authenticated/admin-users")({
@@ -66,7 +66,12 @@ function AdminUsersPage() {
   const createUserFn = useServerFn(createSaccoUser);
   const resetPasswordFn = useServerFn(resetSaccoUserPassword);
   const setPasswordFn = useServerFn(setSaccoUserPassword);
+  const updateUserFn = useServerFn(updateSaccoUser);
+  const deleteUserFn = useServerFn(deleteSaccoUser);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", phone: "" });
   const [passwordResetUser, setPasswordResetUser] = useState<{ id: string; name: string; email: string } | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [createForm, setCreateForm] = useState({
@@ -192,6 +197,56 @@ function AdminUsersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const updateUser = useMutation({
+    mutationFn: async () => {
+      if (!editingUser) {
+        throw new Error("Select a user first");
+      }
+      const result = await updateUserFn({
+        data: {
+          user_id: editingUser.id,
+          full_name: editForm.full_name,
+          email: editForm.email,
+          phone: editForm.phone,
+        },
+      });
+      if (!result.success) {
+        throw new Error(result.error ?? "User update failed");
+      }
+    },
+    onSuccess: () => {
+      toast.success("User details updated");
+      setEditingUser(null);
+      setEditForm({ full_name: "", email: "", phone: "" });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeUser = useMutation({
+    mutationFn: async () => {
+      if (!deleteUser) {
+        throw new Error("Select a user first");
+      }
+      if (deleteUser.roles.includes("admin")) {
+        throw new Error("Admin accounts cannot be removed from the system.");
+      }
+      const result = await deleteUserFn({ data: { user_id: deleteUser.id } });
+      if (!result.success) {
+        throw new Error(result.error ?? "User removal failed");
+      }
+    },
+    onSuccess: () => {
+      toast.success("User account removed");
+      setDeleteUser(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-member-options"] });
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const memberOptions = useQuery({
     queryKey: ["admin-member-options"],
     enabled: isAdmin,
@@ -277,9 +332,36 @@ function AdminUsersPage() {
     },
     {
       key: "actions",
-      header: "Access",
+      header: "Actions",
       cell: (r) => (
         <div className="flex justify-end gap-2">
+          {isAdmin ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditingUser(r);
+                  setEditForm({
+                    full_name: r.full_name ?? "",
+                    email: r.email ?? "",
+                    phone: r.phone ?? "",
+                  });
+                }}
+              >
+                Edit
+              </Button>
+              {!r.roles.includes("admin") ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteUser(r)}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -445,6 +527,74 @@ function AdminUsersPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit user</DialogTitle>
+            <DialogDescription>Update the selected user profile details.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="admin-edit-name">Full name</Label>
+              <Input
+                id="admin-edit-name"
+                value={editForm.full_name}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, full_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-edit-email">Email</Label>
+              <Input
+                id="admin-edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-edit-phone">Phone</Label>
+              <Input
+                id="admin-edit-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setEditingUser(null);
+              setEditForm({ full_name: "", email: "", phone: "" });
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={() => updateUser.mutate()} disabled={updateUser.isPending || !editForm.full_name.trim()}>
+              {updateUser.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteUser} onOpenChange={(open) => !open && setDeleteUser(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove user account?</DialogTitle>
+            <DialogDescription>
+              This removes {deleteUser?.full_name ?? "this account"} and its access. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUser(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => removeUser.mutate()} disabled={removeUser.isPending}>
+              {removeUser.isPending ? "Removing…" : "Yes, remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!passwordResetUser} onOpenChange={(open) => !open && setPasswordResetUser(null)}>
         <DialogContent className="sm:max-w-md">

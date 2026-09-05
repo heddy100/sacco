@@ -15,7 +15,7 @@ import { useRoles, useSaccoSettings } from "@/hooks/useSacco";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Settings — Flobetto SACCO" }, { name: "description", content: "Customize SACCO identity and financial rules." }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Settings — Flobbeto SACCO" }, { name: "description", content: "Customize SACCO identity and financial rules." }, { name: "robots", content: "noindex" }] }),
   component: SettingsPage,
 });
 

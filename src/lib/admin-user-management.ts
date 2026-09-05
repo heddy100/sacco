@@ -19,6 +19,17 @@ export type AdminSetUserPasswordInput = {
   password: string;
 };
 
+export type AdminUpdateUserInput = {
+  user_id: string;
+  full_name?: string;
+  email?: string;
+  phone?: string;
+};
+
+export type AdminDeleteUserInput = {
+  user_id: string;
+};
+
 export const resetSaccoUserPassword = createServerFn({ method: "POST" })
   .validator((input: AdminResetPasswordInput) => input)
   .handler(async ({ data }) => {
@@ -59,6 +70,71 @@ export const setSaccoUserPassword = createServerFn({ method: "POST" })
     });
 
     if (error) throw error;
+
+    return { success: true };
+  });
+
+export const updateSaccoUser = createServerFn({ method: "POST" })
+  .validator((input: AdminUpdateUserInput) => input)
+  .handler(async ({ data }) => {
+    if (!data.user_id) {
+      throw new Error("User is required");
+    }
+
+    const fullName = data.full_name?.trim() ?? "";
+    const email = data.email?.trim() ?? "";
+    const phone = data.phone?.trim() ?? "";
+
+    if (!fullName) {
+      throw new Error("Full name is required");
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("Enter a valid email address");
+    }
+
+    const authUpdate: { email?: string; phone?: string; user_metadata?: { full_name: string } } = {
+      user_metadata: { full_name: fullName },
+    };
+
+    if (email) authUpdate.email = email;
+    if (phone) authUpdate.phone = phone;
+
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, authUpdate);
+    if (authError) throw authError;
+
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        full_name: fullName,
+        email: email || null,
+        phone: phone || null,
+      })
+      .eq("id", data.user_id);
+
+    if (profileError) throw profileError;
+
+    return { success: true };
+  });
+
+export const deleteSaccoUser = createServerFn({ method: "POST" })
+  .validator((input: AdminDeleteUserInput) => input)
+  .handler(async ({ data }) => {
+    if (!data.user_id) {
+      throw new Error("User is required");
+    }
+
+    const { error: roleError } = await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    if (roleError) throw roleError;
+
+    const { error: memberError } = await supabaseAdmin.from("members").update({ user_id: null }).eq("user_id", data.user_id);
+    if (memberError) throw memberError;
+
+    const { error: profileError } = await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
+    if (profileError) throw profileError;
+
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (deleteError) throw deleteError;
 
     return { success: true };
   });

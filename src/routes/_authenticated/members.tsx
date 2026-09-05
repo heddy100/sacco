@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useBalances, useRoles, useSaccoSettings, useSession } from "@/hooks/useSacco";
+import { useBalances, usePermissions, useRoles, useSaccoSettings, useSession } from "@/hooks/useSacco";
 import { supabase } from "@/integrations/supabase/client";
 import { exportPdfTable } from "@/lib/pdf";
 import { shortDate, ugx } from "@/lib/sacco";
@@ -97,8 +97,10 @@ type MemberRow = {
 
 function MembersPage() {
   const { isAdmin } = useRoles();
+  const { can } = usePermissions();
   const { user } = useSession();
   const settings = useSaccoSettings();
+  const canManageMembers = isAdmin || can("members.manage");
   const queryClient = useQueryClient();
   const balances = useBalances();
   const [open, setOpen] = useState(false);
@@ -317,7 +319,7 @@ function MembersPage() {
       header: "Actions",
       className: "text-right",
       cell: (m) =>
-        isAdmin ? (
+        canManageMembers ? (
           <div className="flex justify-end gap-1">
             <Button
               variant="ghost"
@@ -389,7 +391,7 @@ function MembersPage() {
                 })
               }
             />
-            {isAdmin ? (
+            {canManageMembers ? (
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                   <Button

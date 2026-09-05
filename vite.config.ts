@@ -18,6 +18,16 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    host: "127.0.0.1",
+    port: 3000,
+    strictPort: true,
+  },
+  preview: {
+    host: "127.0.0.1",
+    port: 4173,
+    strictPort: true,
+  },
   resolve: {
     tsconfigPaths: true,
     alias: {
