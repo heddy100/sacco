@@ -31,6 +31,23 @@ This project provides a secure member portal and administrative dashboard for ma
 3. Open the app in the browser at:
    http://localhost:8080/
 
+## Deploy to Vercel
+
+Import this repository into Vercel. The included `vercel.json` uses `npm run build`, serves the generated client assets, and routes SSR requests through the Vercel function adapter.
+
+Add these environment variables in the Vercel project settings for Production, Preview, and Development as needed:
+
+```text
+SUPABASE_URL
+SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+NEXT_PUBLIC_SITE_URL=https://your-project.vercel.app
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` is server-only and must not be exposed to client-side code. After the first deployment, update `NEXT_PUBLIC_SITE_URL` to the deployed domain used for password-reset links.
+
 ## Environment variables
 
 Create a local environment file with your Supabase configuration:
