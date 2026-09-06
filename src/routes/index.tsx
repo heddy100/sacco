@@ -55,7 +55,7 @@ function Landing() {
           </h1>
           <p className="mt-4 max-w-2xl text-sm text-primary-foreground/80">
             One secure place for the school staff SACCO: member records, savings, shares, loan
-            approvals, repayments and financial reports — with every transaction traceable from
+            approvals, repayments and financial reports with every transaction traceable from
             initiation to reconciliation.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
