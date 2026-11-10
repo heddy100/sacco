@@ -1,22 +1,49 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { normalizeUgandanPhone } from "@/lib/phone";
+
+async function requireAdmin() {
+  const authorization = getRequest().headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    throw new Error("Unauthorized");
+  }
+
+  const token = authorization.slice("Bearer ".length);
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !userData.user) {
+    throw new Error("Unauthorized");
+  }
+
+  const { data: adminRole, error: roleError } = await supabaseAdmin
+    .from("user_roles")
+    .select("user_id")
+    .eq("user_id", userData.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (roleError) throw roleError;
+  if (!adminRole) throw new Error("Forbidden: administrator access required");
+}
 
 export type AdminCreateUserInput = {
   full_name: string;
   email: string;
-  password: string;
+  phone: string;
+  pin: string;
   role: "admin" | "treasurer" | "committee" | "member";
   member_id?: string | null;
 };
 
-export type AdminResetPasswordInput = {
-  email: string;
-};
-
 export type AdminSetUserPasswordInput = {
   user_id: string;
-  password: string;
+  pin: string;
+};
+
+export type MigrateSaccoAccountInput = {
+  phone: string;
+  pin: string;
 };
 
 export type AdminUpdateUserInput = {
@@ -30,17 +57,20 @@ export type AdminDeleteUserInput = {
   user_id: string;
 };
 
-export const resetSaccoUserPassword = createServerFn({ method: "POST" })
-  .validator((input: AdminResetPasswordInput) => input)
+export const setSaccoUserPassword = createServerFn({ method: "POST" })
+  .validator((input: AdminSetUserPasswordInput) => input)
   .handler(async ({ data }) => {
-    const email = data.email.trim();
-
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error("Enter a valid email address");
+    await requireAdmin();
+    if (!data.user_id) {
+      throw new Error("User is required");
     }
 
-    const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:5174"}/reset-password`,
+    if (!/^\d{6}$/.test(data.pin)) {
+      throw new Error("PIN must be exactly 6 digits");
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
+      password: data.pin,
     });
 
     if (error) throw error;
@@ -48,35 +78,66 @@ export const resetSaccoUserPassword = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-export const setSaccoUserPassword = createServerFn({ method: "POST" })
-  .validator((input: AdminSetUserPasswordInput) => input)
+export const migrateSaccoAccountToPhonePin = createServerFn({ method: "POST" })
+  .validator((input: MigrateSaccoAccountInput) => input)
   .handler(async ({ data }) => {
-    const password = data.password;
+    const authorization = getRequest().headers.get("authorization");
+    if (!authorization?.startsWith("Bearer "))
+      throw new Error("Sign in to your existing account first");
 
-    if (!data.user_id) {
-      throw new Error("User is required");
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(
+      authorization.slice("Bearer ".length),
+    );
+    if (userError || !userData.user) throw new Error("Your current account session is invalid");
+
+    if (!/^\+256[0-9]{9}$/.test(data.phone)) {
+      throw new Error("Enter a Ugandan phone number in +256XXXXXXXXX format");
+    }
+    if (!/^\d{6}$/.test(data.pin)) throw new Error("PIN must be exactly 6 digits");
+
+    const [
+      { data: profile, error: profileLookupError },
+      { data: member, error: memberLookupError },
+    ] = await Promise.all([
+      supabaseAdmin.from("profiles").select("phone").eq("id", userData.user.id).maybeSingle(),
+      supabaseAdmin
+        .from("members")
+        .select("id, phone")
+        .eq("user_id", userData.user.id)
+        .maybeSingle(),
+    ]);
+    if (profileLookupError) throw profileLookupError;
+    if (memberLookupError) throw memberLookupError;
+    const storedPhones = [profile?.phone, member?.phone].map((storedPhone) =>
+      storedPhone ? normalizeUgandanPhone(storedPhone) : null,
+    );
+    if (!storedPhones.includes(data.phone)) {
+      throw new Error(
+        "The phone must match the number already recorded for your membership. Contact the SACCO office to update it.",
+      );
     }
 
-    if (password.length < 8) {
-      throw new Error("Password must be at least 8 characters");
-    }
-
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      throw new Error("Password must include uppercase, lowercase and a number");
-    }
-
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
-      password,
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
+      phone: data.phone,
+      phone_confirm: true,
+      password: data.pin,
     });
+    if (authError) throw authError;
 
-    if (error) throw error;
+    const [{ error: profileError }, { error: memberError }] = await Promise.all([
+      supabaseAdmin.from("profiles").update({ phone: data.phone }).eq("id", userData.user.id),
+      supabaseAdmin.from("members").update({ phone: data.phone }).eq("user_id", userData.user.id),
+    ]);
+    if (profileError) throw profileError;
+    if (memberError) throw memberError;
 
-    return { success: true };
+    return { success: true, user_id: userData.user.id };
   });
 
 export const updateSaccoUser = createServerFn({ method: "POST" })
   .validator((input: AdminUpdateUserInput) => input)
   .handler(async ({ data }) => {
+    await requireAdmin();
     if (!data.user_id) {
       throw new Error("User is required");
     }
@@ -93,14 +154,25 @@ export const updateSaccoUser = createServerFn({ method: "POST" })
       throw new Error("Enter a valid email address");
     }
 
-    const authUpdate: { email?: string; phone?: string; user_metadata?: { full_name: string } } = {
+    const authUpdate: {
+      email?: string;
+      phone?: string;
+      phone_confirm?: boolean;
+      user_metadata?: { full_name: string };
+    } = {
       user_metadata: { full_name: fullName },
     };
 
     if (email) authUpdate.email = email;
-    if (phone) authUpdate.phone = phone;
+    if (phone) {
+      authUpdate.phone = phone;
+      authUpdate.phone_confirm = true;
+    }
 
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, authUpdate);
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+      data.user_id,
+      authUpdate,
+    );
     if (authError) throw authError;
 
     const { error: profileError } = await supabaseAdmin
@@ -120,17 +192,27 @@ export const updateSaccoUser = createServerFn({ method: "POST" })
 export const deleteSaccoUser = createServerFn({ method: "POST" })
   .validator((input: AdminDeleteUserInput) => input)
   .handler(async ({ data }) => {
+    await requireAdmin();
     if (!data.user_id) {
       throw new Error("User is required");
     }
 
-    const { error: roleError } = await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.user_id);
     if (roleError) throw roleError;
 
-    const { error: memberError } = await supabaseAdmin.from("members").update({ user_id: null }).eq("user_id", data.user_id);
+    const { error: memberError } = await supabaseAdmin
+      .from("members")
+      .update({ user_id: null })
+      .eq("user_id", data.user_id);
     if (memberError) throw memberError;
 
-    const { error: profileError } = await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .delete()
+      .eq("id", data.user_id);
     if (profileError) throw profileError;
 
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
@@ -142,9 +224,10 @@ export const deleteSaccoUser = createServerFn({ method: "POST" })
 export const createSaccoUser = createServerFn({ method: "POST" })
   .validator((input: AdminCreateUserInput) => input)
   .handler(async ({ data }) => {
+    await requireAdmin();
     const fullName = data.full_name.trim();
     const email = data.email.trim();
-    const password = data.password;
+    const phone = data.phone.trim();
 
     if (!fullName) {
       throw new Error("Full name is required");
@@ -154,12 +237,12 @@ export const createSaccoUser = createServerFn({ method: "POST" })
       throw new Error("Enter a valid email address");
     }
 
-    if (password.length < 8) {
-      throw new Error("Password must be at least 8 characters");
+    if (!/^\+256[0-9]{9}$/.test(phone)) {
+      throw new Error("Enter a Ugandan phone number in +256XXXXXXXXX format");
     }
 
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      throw new Error("Password must include uppercase, lowercase and a number");
+    if (!/^\d{6}$/.test(data.pin)) {
+      throw new Error("PIN must be exactly 6 digits");
     }
 
     if (data.member_id) {
@@ -176,10 +259,10 @@ export const createSaccoUser = createServerFn({ method: "POST" })
     }
 
     const { data: createdUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName },
+      phone,
+      password: data.pin,
+      phone_confirm: true,
+      user_metadata: { full_name: fullName, contact_email: email },
     });
 
     if (createError) throw createError;
@@ -192,6 +275,7 @@ export const createSaccoUser = createServerFn({ method: "POST" })
         id: createdUser.user.id,
         full_name: fullName,
         email,
+        phone,
       },
       { onConflict: "id" },
     );

@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { useBalances, usePermissions, useRoles, useSaccoSettings, useSession } from "@/hooks/useSacco";
 import { supabase } from "@/integrations/supabase/client";
-import { exportPdfTable } from "@/lib/pdf";
+import { exportExcel, exportPdfTable } from "@/lib/pdf";
 import { shortDate, ugx } from "@/lib/sacco";
 
 export const Route = createFileRoute("/_authenticated/members")({
@@ -81,6 +81,7 @@ type MemberRow = {
   staff_no: string | null;
   national_id: string | null;
   gender: string | null;
+  date_of_birth: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -119,7 +120,7 @@ function MembersPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("members")
-        .select("id, member_no, full_name, staff_no, national_id, gender, phone, email, address, position, department_id, next_of_kin, next_of_kin_phone, registration_fee, subscription_fee, join_date, status, departments(name)")
+        .select("id, member_no, full_name, staff_no, national_id, gender, date_of_birth, phone, email, address, position, department_id, next_of_kin, next_of_kin_phone, registration_fee, subscription_fee, join_date, status, departments(name)")
         .order("member_no");
       if (error) throw error;
       return data as unknown as MemberRow[];
@@ -370,6 +371,7 @@ function MembersPage() {
         toolbar={
           <>
             <ExportMenu
+              disabled={!can("reports.export")}
               onPdf={() =>
                 exportPdfTable({
                   filename: "flobbeto-members.pdf",
@@ -389,6 +391,35 @@ function MembersPage() {
                   orientation: "landscape",
                   columnStyles: Object.fromEntries([4, 5, 6, 7].map((i) => [i, { halign: "right" as const }])),
                 })
+              }
+              onExcel={() =>
+                exportExcel(
+                  "flobbeto-member-details.xlsx",
+                  "Members",
+                  rows.map((m) => ({
+                    "Member no.": m.member_no,
+                    "Full name": m.full_name,
+                    "Staff no.": m.staff_no ?? "",
+                    "National ID": m.national_id ?? "",
+                    Gender: m.gender ?? "",
+                    "Date of birth": m.date_of_birth ?? "",
+                    Email: m.email ?? "",
+                    Phone: m.phone ?? "",
+                    Address: m.address ?? "",
+                    Department: m.departments?.name ?? "",
+                    Position: m.position ?? "",
+                    "Next of kin": m.next_of_kin ?? "",
+                    "Next of kin phone": m.next_of_kin_phone ?? "",
+                    "Join date": m.join_date,
+                    Status: m.status,
+                    "Registration fee": Number(m.registration_fee ?? 0),
+                    "Subscription fee": Number(m.subscription_fee ?? 0),
+                    Savings: Number(bal(m.id)?.savings_balance ?? 0),
+                    Shares: Number(bal(m.id)?.shares_owned ?? 0),
+                    "Share value": Number(bal(m.id)?.shares_value ?? 0),
+                    "Loan balance": Number(bal(m.id)?.loan_balance ?? 0),
+                  })),
+                )
               }
             />
             {canManageMembers ? (

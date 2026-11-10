@@ -31,6 +31,7 @@ type NavItem = { to: string; label: string; icon: typeof Users; staffOnly?: bool
 const NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/members", label: "Members", icon: Users, staffOnly: true },
+  { to: "/monthly-plan", label: "Monthly plan", icon: Wallet },
   { to: "/savings", label: "Savings", icon: Wallet, staffOnly: true },
   { to: "/shares", label: "Shares", icon: PieChart, staffOnly: true },
   { to: "/loans", label: "Loans", icon: HandCoins },

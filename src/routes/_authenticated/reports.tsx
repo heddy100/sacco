@@ -4,6 +4,7 @@ import { Printer } from "lucide-react";
 import { useState } from "react";
 
 import { AppShell } from "@/components/AppShell";
+import { MemberStatement } from "@/components/MemberStatement";
 import { StatCard } from "@/components/StatCard";
 import { ExportMenu } from "@/components/ExportMenu";
 import { exportExcel, exportPdfTable } from "@/lib/pdf";
@@ -20,9 +21,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useBalances, usePermissions } from "@/hooks/useSacco";
+import { useBalances, useMembersList, usePermissions } from "@/hooks/useSacco";
 import { supabase } from "@/integrations/supabase/client";
 import { LOAN_STATUS_LABEL, loanTotals, shortDate, ugx } from "@/lib/sacco";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
@@ -42,7 +50,9 @@ function ReportsPage() {
   const canExport = can("reports.export");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
   const balances = useBalances();
+  const memberOptions = useMembersList();
 
   const txns = useQuery({
     queryKey: ["report-transactions"],
@@ -79,6 +89,7 @@ function ReportsPage() {
   ];
 
   const members = balances.data ?? [];
+  const selectedMember = members.find((member) => member.member_id === selectedMemberId);
   const loanRows = (loans.data ?? []).filter((l) => inRange(String(l.applied_at).slice(0, 10)));
 
   const statusSummary = Object.keys(LOAN_STATUS_LABEL).map((s) => {
@@ -192,7 +203,7 @@ function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="members">
-          <Card className="shadow-[var(--shadow-card)]">
+          <Card className="mb-6 shadow-[var(--shadow-card)]">
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base">Member balances</CardTitle>
               <ExportMenu
@@ -265,6 +276,46 @@ function ReportsPage() {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+          <Card className="mb-6 shadow-[var(--shadow-card)]">
+            <CardHeader>
+              <CardTitle className="text-base">Individual member financial report</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="max-w-md space-y-1.5">
+                <Label htmlFor="report-member">Select a member</Label>
+                <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                  <SelectTrigger id="report-member">
+                    <SelectValue placeholder="Choose a member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(memberOptions.data ?? []).map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.member_no} — {member.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedMemberId && selectedMember ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatCard label="Savings balance" value={ugx(Number(selectedMember.savings_balance ?? 0))} />
+                    <StatCard
+                      label="Shares"
+                      value={`${Number(selectedMember.shares_owned ?? 0).toLocaleString()} · ${ugx(Number(selectedMember.shares_value ?? 0))}`}
+                    />
+                    <StatCard label="Total borrowed" value={ugx(Number(selectedMember.total_borrowed ?? 0))} />
+                    <StatCard label="Loan balance" value={ugx(Number(selectedMember.loan_balance ?? 0))} />
+                  </div>
+                  <MemberStatement memberId={selectedMemberId} />
+                </>
+              ) : selectedMemberId ? (
+                <p className="text-sm text-muted-foreground">Member balances are loading or unavailable.</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Choose a member to view and print their financial statement.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

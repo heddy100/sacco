@@ -12,6 +12,8 @@ This project provides a secure member portal and administrative dashboard for ma
 - loans and repayments
 - transaction history
 - reports and financial summaries
+- self-service member registration with linked member records
+- monthly savings and share plans, tracked separately from posted payments
 - role-based access control
 
 ## Tech stack
@@ -58,6 +60,18 @@ SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 VITE_SUPABASE_URL="https://your-project.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 ```
+
+Apply the Supabase migrations in `supabase/migrations` before using member self-registration or monthly plan tracking.
+
+## Phone sign-in and PINs
+
+- Enable Phone authentication in Supabase Auth. Disable phone confirmations to allow registration without sending SMS OTPs; an SMS provider is not needed while confirmations are disabled.
+- Set Supabase's minimum password length to 6 and allow numeric-only values; the app uses the Supabase Auth password field for the requested 6-digit PIN.
+- New and staff-created accounts sign in with their Ugandan phone number and PIN. Email collected during registration is retained as contact information.
+- Existing email/password users can use **Set up phone + PIN** on the sign-in page. They must authenticate with current credentials, and the phone entered must match the SACCO membership record.
+- Forgotten PINs must be reset by a SACCO administrator; self-service SMS recovery is disabled.
+
+A six-digit PIN is weaker than a passphrase. Because phone numbers are not SMS-verified while OTP is disabled, verify membership phone numbers through the SACCO office before linking accounts. Use Supabase Auth rate limits and enable additional authentication controls for this financial application where possible.
 
 ## Notes
 

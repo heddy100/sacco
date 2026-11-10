@@ -349,6 +349,44 @@ export type Database = {
           },
         ]
       }
+      monthly_member_plans: {
+        Row: {
+          id: string
+          member_id: string
+          plan_month: string
+          savings_amount: number
+          shares_count: number
+          submitted_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          plan_month: string
+          savings_amount?: number
+          shares_count?: number
+          submitted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          plan_month?: string
+          savings_amount?: number
+          shares_count?: number
+          submitted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_member_plans_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

@@ -12,10 +12,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Reset password — Flobbeto SACCO" },
-      { name: "description", content: "Set a new password for your Flobbeto SACCO account." },
-      { property: "og:title", content: "Reset password — Flobbeto SACCO" },
-      { property: "og:description", content: "Choose a new password for your SACCO account." },
+      { title: "Reset PIN — Flobbeto SACCO" },
+      { name: "description", content: "Set a new PIN for your Flobbeto SACCO account." },
+      { property: "og:title", content: "Reset PIN — Flobbeto SACCO" },
+      { property: "og:description", content: "Choose a new PIN for your SACCO account." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -29,7 +29,10 @@ function ResetPassword() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = z.string().min(8, "Password must be at least 8 characters").safeParse(password);
+    const parsed = z
+      .string()
+      .regex(/^\d{6}$/, "PIN must be exactly 6 digits")
+      .safeParse(password);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]!.message);
       return;
@@ -49,10 +52,10 @@ function ResetPassword() {
         .select("role")
         .eq("user_id", userData.user?.id ?? "");
       const isAdmin = (roleData ?? []).some((row) => row.role === "admin");
-      toast.success("Password updated");
+      toast.success("PIN updated");
       navigate({ to: isAdmin ? "/admin-users" : "/dashboard", replace: true });
     } catch {
-      toast.success("Password updated");
+      toast.success("PIN updated");
       navigate({ to: "/dashboard", replace: true });
     }
   }
@@ -61,25 +64,26 @@ function ResetPassword() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md shadow-[var(--shadow-card)]">
         <CardHeader>
-          <CardTitle className="font-display">Set a new password</CardTitle>
-          <CardDescription>Choose a strong password of at least 8 characters.</CardDescription>
+          <CardTitle className="font-display">Set a new 6-digit PIN</CardTitle>
+          <CardDescription>Choose a six-digit numeric PIN.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={submit}>
             <div className="space-y-1.5">
-              <Label htmlFor="new-password">New password</Label>
+              <Label htmlFor="new-password">New PIN</Label>
               <Input
                 id="new-password"
                 type="password"
                 autoComplete="new-password"
                 value={password}
-                maxLength={72}
-                onChange={(e) => setPassword(e.target.value)}
+                inputMode="numeric"
+                maxLength={6}
+                onChange={(e) => setPassword(e.target.value.replace(/\D/g, ""))}
                 required
               />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Saving…" : "Update password"}
+              {busy ? "Saving…" : "Update PIN"}
             </Button>
           </form>
         </CardContent>

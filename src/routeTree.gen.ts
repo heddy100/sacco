@@ -19,6 +19,7 @@ import { Route as AuthenticatedDashboardRouteImport } from "./routes/_authentica
 import { Route as AuthenticatedExpensesRouteImport } from "./routes/_authenticated/expenses"
 import { Route as AuthenticatedLoansRouteImport } from "./routes/_authenticated/loans"
 import { Route as AuthenticatedMembersRouteImport } from "./routes/_authenticated/members"
+import { Route as AuthenticatedMonthlyPlanRouteImport } from "./routes/_authenticated/monthly-plan"
 import { Route as AuthenticatedMyAccountRouteImport } from "./routes/_authenticated/my-account"
 import { Route as AuthenticatedRepaymentsRouteImport } from "./routes/_authenticated/repayments"
 import { Route as AuthenticatedReportsRouteImport } from "./routes/_authenticated/reports"
@@ -78,6 +79,12 @@ const AuthenticatedMembersRoute = AuthenticatedMembersRouteImport.update({
   path: "/members",
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMonthlyPlanRoute =
+  AuthenticatedMonthlyPlanRouteImport.update({
+    id: "/monthly-plan",
+    path: "/monthly-plan",
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMyAccountRoute = AuthenticatedMyAccountRouteImport.update({
   id: "/my-account",
   path: "/my-account",
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
   "/expenses": typeof AuthenticatedExpensesRoute
   "/loans": typeof AuthenticatedLoansRoute
   "/members": typeof AuthenticatedMembersRouteWithChildren
+  "/monthly-plan": typeof AuthenticatedMonthlyPlanRoute
   "/my-account": typeof AuthenticatedMyAccountRoute
   "/repayments": typeof AuthenticatedRepaymentsRoute
   "/reports": typeof AuthenticatedReportsRoute
@@ -150,6 +158,7 @@ export interface FileRoutesByTo {
   "/expenses": typeof AuthenticatedExpensesRoute
   "/loans": typeof AuthenticatedLoansRoute
   "/members": typeof AuthenticatedMembersRouteWithChildren
+  "/monthly-plan": typeof AuthenticatedMonthlyPlanRoute
   "/my-account": typeof AuthenticatedMyAccountRoute
   "/repayments": typeof AuthenticatedRepaymentsRoute
   "/reports": typeof AuthenticatedReportsRoute
@@ -171,6 +180,7 @@ export interface FileRoutesById {
   "/_authenticated/expenses": typeof AuthenticatedExpensesRoute
   "/_authenticated/loans": typeof AuthenticatedLoansRoute
   "/_authenticated/members": typeof AuthenticatedMembersRouteWithChildren
+  "/_authenticated/monthly-plan": typeof AuthenticatedMonthlyPlanRoute
   "/_authenticated/my-account": typeof AuthenticatedMyAccountRoute
   "/_authenticated/repayments": typeof AuthenticatedRepaymentsRoute
   "/_authenticated/reports": typeof AuthenticatedReportsRoute
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | "/expenses"
     | "/loans"
     | "/members"
+    | "/monthly-plan"
     | "/my-account"
     | "/repayments"
     | "/reports"
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | "/expenses"
     | "/loans"
     | "/members"
+    | "/monthly-plan"
     | "/my-account"
     | "/repayments"
     | "/reports"
@@ -231,6 +243,7 @@ export interface FileRouteTypes {
     | "/_authenticated/expenses"
     | "/_authenticated/loans"
     | "/_authenticated/members"
+    | "/_authenticated/monthly-plan"
     | "/_authenticated/my-account"
     | "/_authenticated/repayments"
     | "/_authenticated/reports"
@@ -320,6 +333,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedMembersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    "/_authenticated/monthly-plan": {
+      id: "/_authenticated/monthly-plan"
+      path: "/monthly-plan"
+      fullPath: "/monthly-plan"
+      preLoaderRoute: typeof AuthenticatedMonthlyPlanRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     "/_authenticated/my-account": {
       id: "/_authenticated/my-account"
       path: "/my-account"
@@ -397,6 +417,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
   AuthenticatedLoansRoute: typeof AuthenticatedLoansRoute
   AuthenticatedMembersRoute: typeof AuthenticatedMembersRouteWithChildren
+  AuthenticatedMonthlyPlanRoute: typeof AuthenticatedMonthlyPlanRoute
   AuthenticatedMyAccountRoute: typeof AuthenticatedMyAccountRoute
   AuthenticatedRepaymentsRoute: typeof AuthenticatedRepaymentsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -413,6 +434,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
   AuthenticatedLoansRoute: AuthenticatedLoansRoute,
   AuthenticatedMembersRoute: AuthenticatedMembersRouteWithChildren,
+  AuthenticatedMonthlyPlanRoute: AuthenticatedMonthlyPlanRoute,
   AuthenticatedMyAccountRoute: AuthenticatedMyAccountRoute,
   AuthenticatedRepaymentsRoute: AuthenticatedRepaymentsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
